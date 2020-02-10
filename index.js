@@ -2,29 +2,30 @@ var express = require('express')
 var app = express()
 var mongoose = require('mongoose')
 var morgan = require('morgan')
+var dns = require('dns');
 var dotenv = require('dotenv')
 dotenv.config()
-var db = mongoose.connect(
-  process.env.MONGODB_URI || 'mongodb://localhost/test',
-  { useNewUrlParser: true, useUnifiedTopology: true }
-)
-var Url = require('./Model/url')
+var db = mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost/test')
+var Url = require('./model/url')
 
 app.use(morgan('dev'))
 app.use(express.static(__dirname + '/View'))
+
+app.use(express.urlencoded());
 
 function validateURL(url) {
   // Checks to see if it is an actual url
   // Regex from https://gist.github.com/dperini/729294
   var regex = /^(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,}))\.?)(?::\d{2,5})?(?:[/?#]\S*)?$/i
   return regex.test(url)
+  
 }
 
 function saveUrl(rand, req, res) {
   var fullUrl = req.protocol + '://' + req.get('host') + '/'
 
   var url = new Url()
-  var orignal = req.url.replace('/new/', '')
+  var orignal = req.body.url;
   url.short_url = fullUrl + rand.toString()
   url.orignal_url = orignal
 
@@ -62,7 +63,7 @@ function checkCodeAndUpdate(rand, req, res, orignal) {
     },
     function(err, codes) {
       if (err) {
-        res.send(err)
+        return res.send(err)
       } else {
         if (codes.length > 0) {
           rand = rand * 2 + 1
@@ -75,14 +76,16 @@ function checkCodeAndUpdate(rand, req, res, orignal) {
   )
 }
 
-app.get('/new/*', function(req, res) {
+app.post('/api/shorturl/new', function(req, res) {
   var rand = Math.floor(Math.random() * 10000 + 1)
-  var orig = req.url.replace('/new/', '')
+  //var orig = req.url.replace('/new/', '')
+  console.log(req.body.url);
+  var orig = req.body.url;
 
   if (validateURL(orig)) {
     checkCodeAndUpdate(rand, req, res)
   } else {
-    res.status(500).send({ error: 'Invalid URL!' })
+    res.status(500).send({ error: 'Invalid URL' })
   }
 })
 
@@ -108,7 +111,7 @@ app.get('/*', function(req, res) {
 app.get('/', function(req, res) {
   res.sendFile(__dirname + 'index.html')
 })
-const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
-  console.log(`Our app is running on port ${PORT}`)
+
+app.listen(process.env.PORT || 5000, function() {
+  console.log('Running on 5000 port!')
 })
